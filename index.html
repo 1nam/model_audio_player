@@ -3,169 +3,103 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Music + 3D Art Player</title>
+<title>Alien Sneeze Simulator</title>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 <style>
   body {
-    font-family: Arial, sans-serif;
+    margin: 0;
+    overflow: hidden;
     background: #121212;
+    font-family: Arial, sans-serif;
     color: #fff;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    justify-content: center;
+    height: 100vh;
   }
-  h1 { color: #00f; margin-bottom: 10px; text-align: center; }
-  #nowPlaying { margin-bottom: 30px; font-size: 1.2em; color: #0ff; }
-  .audio-player {
-    background: #1e1e1e;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 20px;
-    width: 90%;
-    max-width: 400px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    box-shadow: 0 0 10px #000;
-    transition: box-shadow 0.3s, border 0.3s;
+  model-viewer {
+    width: 150px;
+    height: 150px;
+    cursor: pointer;
+    margin-top: 50px;
   }
-  .audio-player.active { box-shadow: 0 0 20px #00f; border: 2px solid #00f; }
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-around;
-    width: 100%;
-    margin-top: 10px;
+  #info {
+    position: absolute;
+    top: 10px;
+    color: #0ff;
   }
-  button {
-    background: #00f; color: #fff; border: none;
-    padding: 8px 12px; border-radius: 5px; cursor: pointer;
-    margin: 5px; transition: background 0.3s;
+  canvas { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    pointer-events: none; 
   }
-  button:hover { background: #0055ff; }
-  input[type="range"] { width: 100px; margin: 5px; }
-  .progress-container { width: 100%; height: 5px; background: #333; border-radius: 5px; margin-top: 10px; cursor: pointer; }
-  .progress { height: 100%; background: #00f; width: 0%; border-radius: 5px; }
-  @media (max-width: 400px) {
-    .controls { flex-direction: column; align-items: center; }
-    input[type="range"] { width: 80%; }
-  }
-  model-viewer { cursor: pointer; border-radius: 10px; box-shadow: 0 0 5px #000; }
 </style>
 </head>
 <body>
 
-<h1>Music I Created with AI</h1>
-<div id="nowPlaying">Now Playing: None</div>
-<div id="playersContainer"></div>
+<div id="info">Click the alien to make it sneeze! Right-click to toggle mask.</div>
+<canvas id="sneezeCanvas"></canvas>
+<model-viewer id="alien" src="https://modelviewer.dev/shared-assets/models/Cube.glb" auto-rotate rotation-per-second="10"></model-viewer>
 
 <script>
-const tracks = [
-  { title: "Track 1", audioSrc: "audio1.mp3", modelSrc: "model1.glb" },
-  { title: "Track 2", audioSrc: "audio2.mp3", modelSrc: "model2.glb" },
-  { title: "Track 3", audioSrc: "audio3.mp3", modelSrc: "model3.glb" }
-];
+const canvas = document.getElementById('sneezeCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const container = document.getElementById('playersContainer');
-const nowPlaying = document.getElementById('nowPlaying');
+const alien = document.getElementById('alien');
+let masked = false;
 
-tracks.forEach((track, i) => {
-  const player = document.createElement('div');
-  player.className = 'audio-player';
-  player.id = `player${i}`;
+// Function to create sneeze particles
+function sneezeParticles() {
+  const particles = [];
+  for (let i = 0; i < 50; i++) {
+    particles.push({
+      x: canvas.width/2,
+      y: canvas.height/2,
+      vx: (Math.random() - 0.5) * 12,
+      vy: (Math.random() - 0.5) * 12,
+      alpha: 1,
+      size: Math.random()*5 + 2
+    });
+  }
 
-  const title = document.createElement('p');
-  title.textContent = track.title;
-  player.appendChild(title);
+  const interval = setInterval(() => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; 
+      p.y += p.vy; 
+      p.alpha -= 0.03;
+      if(p.alpha>0){
+        ctx.fillStyle = `rgba(0,255,0,${p.alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+      }
+    });
+    if (particles.every(p => p.alpha <= 0)) clearInterval(interval);
+  }, 30);
+}
 
-  const audio = document.createElement('audio');
-  audio.src = track.audioSrc;
-  audio.id = `audio${i}`;
-  player.appendChild(audio);
-
-  const model = document.createElement('model-viewer');
-  model.src = track.modelSrc;
-  model.id = `model${i}`;
-  model.setAttribute('auto-rotate', '');
-  model.setAttribute('rotation-per-second', '0'); // start stationary
-  model.style.width = '150px';
-  model.style.height = '150px';
-  player.appendChild(model);
-
-  const progressContainer = document.createElement('div');
-  progressContainer.className = 'progress-container';
-  const progress = document.createElement('div');
-  progress.className = 'progress';
-  progressContainer.appendChild(progress);
-  player.appendChild(progressContainer);
-
-  audio.addEventListener('timeupdate', () => {
-    progress.style.width = (audio.currentTime / audio.duration) * 100 + '%';
-  });
-  progressContainer.addEventListener('click', e => {
-    const rect = progressContainer.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
-  });
-
-  const controls = document.createElement('div');
-  controls.className = 'controls';
-
-  const muteBtn = document.createElement('button');
-  muteBtn.textContent = 'Mute';
-  muteBtn.onclick = () => { audio.muted = !audio.muted; };
-  controls.appendChild(muteBtn);
-
-  const volumeSlider = document.createElement('input');
-  volumeSlider.type = 'range';
-  volumeSlider.min = 0; volumeSlider.max = 1; volumeSlider.step = 0.01;
-  volumeSlider.value = 1;
-  volumeSlider.oninput = e => { audio.volume = e.target.value; };
-  controls.appendChild(volumeSlider);
-
-  player.appendChild(controls);
-  container.appendChild(player);
-
-  // Click model to play/pause
-  model.addEventListener('click', () => {
-    const isPaused = audio.paused;
-    stopAllTracksExcept(i);
-    if (isPaused) {
-      audio.play();
-      model.setAttribute('rotation-per-second', '30');
-      player.classList.add('active');
-      nowPlaying.textContent = `Now Playing: ${track.title}`;
-      player.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else {
-      audio.pause();
-      audio.currentTime = 0;
-      model.setAttribute('rotation-per-second', '0');
-      player.classList.remove('active');
-      nowPlaying.textContent = 'Now Playing: None';
-    }
-  });
-
-  // Stop model spinning when audio ends naturally
-  audio.addEventListener('ended', () => {
-    model.setAttribute('rotation-per-second', '0');
-    player.classList.remove('active');
-    nowPlaying.textContent = 'Now Playing: None';
-  });
+// Click alien to sneeze
+alien.addEventListener('click', () => {
+  if (!masked) sneezeParticles();
 });
 
-function stopAllTracksExcept(index) {
-  tracks.forEach((t, i) => {
-    if (i !== index) {
-      const a = document.getElementById(`audio${i}`);
-      const m = document.getElementById(`model${i}`);
-      const p = document.getElementById(`player${i}`);
-      a.pause();
-      a.currentTime = 0;
-      m.setAttribute('rotation-per-second', '0');
-      p.classList.remove('active');
-    }
-  });
-}
+// Right-click alien to toggle mask
+alien.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  masked = !masked;
+  alert(masked ? "Mask on! Sneezes contained." : "Mask removed! Watch out for sneezes!");
+});
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
 </script>
 
 </body>
